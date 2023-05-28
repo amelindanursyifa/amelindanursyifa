@@ -1,67 +1,89 @@
 import socket
 import os
 
-def tcp_server():
-    # Mengatur alamat IP dan port untuk server
-    SERVER_HOST = "127.0.0.1"
-    SERVER_PORT = 8080
+# Fungsi untuk mengambil konten file yang diminta oleh client
+def get_file_content(file_path):
+    try:
+        with open(file_path, 'rb') as file:
+            content = file.read()
+        return content
+    except IOError:
+        return None
+
+# Fungsi untuk membuat HTTP response message
+def create_response(status_code, content_type, content):
+    response = "HTTP/1.1 {}\r\n".format(status_code)
+    response += "Content-Type: {}\r\n".format(content_type)
+    response += "Content-Length: {}\r\n".format(len(content))
+    response += "\r\n"
+    response += content.decode('utf-8')
+    return response.encode('utf-8')
+
+# Fungsi untuk memparsing HTTP request yang diterima
+def parse_request(request):
+    lines = request.split('\r\n')
+    if len(lines) < 2:
+        return None
+
+    # Mendapatkan method dan file path dari request
+    method, file_path, _ = lines[0].split(' ')
+
+    # Hanya mendukung GET request
+    if method != 'GET':
+        return None
+
+    return file_path
+
+# Fungsi utama
+def main():
+    # Konfigurasi alamat dan port server
+    server_address = 'localhost'
+    server_port = 8000
 
     # Membuat socket TCP
-    sock_server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock_server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-    # Mengaitkan socket dengan alamat IP dan port
-    sock_server.bind((SERVER_HOST, SERVER_PORT))
+    # Binding socket ke alamat dan port server
+    server_socket.bind((server_address, server_port))
 
-    # Mendengarkan koneksi masuk dari klien
-    sock_server.listen()
-
-    print("Server is Ready")
+    # Listening for incoming connections
+    server_socket.listen(1)
+    print("Server ready in http://{}:{}".format(server_address, server_port))
 
     while True:
-        # Menerima koneksi dari klien
-        sock_client, client_address = sock_server.accept()
+        # Menerima koneksi dari client
+        client_socket, client_address = server_socket.accept()
 
-        # Menerima permintaan dari klien
-        request = sock_client.recv(1024).decode()
-        print("From client: " + request)
+        # Menerima data dari client
+        request_data = client_socket.recv(1024).decode('utf-8')
 
-        # Memproses permintaan
-        response = handle_request(request)
+        # Mem-parsing HTTP request
+        file_path = parse_request(request_data)
 
-        # Mengirimkan respons ke klien
-        sock_client.send(response.encode())
+        if file_path:
+            # Mengambil konten file
+            if file_path == '/':
+                file_content = get_file_content('index.html')
+            else:
+                file_content = get_file_content(file_path[1:])
 
-        # Menutup koneksi dengan klien
-        sock_client.close()
-    
+            if file_content:
+                # Mengirim HTTP response dengan status 200 OK dan konten file
+                response = create_response("200 OK", "text/html", file_content)
+            else:
+                # Mengirim HTTP response dengan status 404 Not Found dan konten dari 404notfound.html
+                not_found_content = get_file_content('404.html')
+                response = create_response("404 Not Found", "text/html", not_found_content)
+        else:
+            # Mengirim HTTP response dengan status 400 Bad Request
+            response_content = "<h1>400 Bad Request</h1>"
+            response = create_response("400 Bad Request", "text/html", response_content.encode('utf-8'))
 
-def handle_request(request):
-    # Memecah permintaan HTTP menjadi baris-baris terpisah
-    request_lines = request.split("\r\n")
+        # Mengirim response ke client
+        client_socket.sendall(response)
 
-    # Mendapatkan jalur dari permintaan GET
-    path = request_lines[0].split(" ")[1]
+        # Menutup koneksi
+        client_socket.close()
 
-    # Menentukan file yang diminta oleh klien
-    file_path = os.path.join(os.getcwd(), "TubesJarkom", path.lstrip("/"))
-
-    # Membuka file yang diminta oleh klien
-    try:
-        with open(file_path, "rb") as file:
-            # Membaca isi file
-            file_content = file.read()
-            # Membuat respons HTTP dengan status 200 OK dan isi file yang diminta
-            response = "HTTP/1.1 200 OK\r\n"
-            response += "Content-Type: text/html\r\n\r\n"
-            response = response.encode() + file_content
-    except FileNotFoundError:
-        # Jika file tidak ditemukan, membuat respons HTTP dengan status 404 Not Found
-        response = "HTTP/1.1 404 Not Found\r\n"
-        response += "Content-Type: text/html\r\n\r\n"
-        response += "<h1>404 Not Found</h1>".encode()
-
-    return response
-
-if __name__ == "__main__":
-    tcp_server()
+if __name__ == '__main__':
+    main()
