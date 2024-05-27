@@ -1,7 +1,7 @@
 import socket
 import os
 
-# Fungsi untuk mengambil konten file yang diminta oleh klien
+# Fungsi untuk mengambil konten file yang diminta oleh client
 def get_file_content(file_path):
     try:
         with open(file_path, 'rb') as file:
