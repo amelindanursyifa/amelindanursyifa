@@ -1,2 +1,2 @@
-# tubesjarkom
-Codingan ini dibuat untuk memenuhi syarat tugas besar jaringan komputer
+# TuBesJarKom
+Codingan ini dibuat untuk memenuhi syarat TuBes Jarkom (Tugas Besar Jaringan Komputer) 
